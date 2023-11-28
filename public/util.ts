@@ -12,6 +12,36 @@ type operation = {
 
 const operations: operation[] = [
   {
+    name: "create letter",
+    endpoint: "/api/letter",
+    method: "POST",
+    fields: { to: "json", content: "input", responseEnabled: "json", delay: "input" },
+  },
+  {
+    name: "get letter by sender",
+    endpoint: "/api/letter",
+    method: "GET",
+    fields: {},
+  },
+  {
+    name: "get letter by receiver",
+    endpoint: "/api/letter/receiver",
+    method: "GET",
+    fields: {user: "input"}
+  },
+  {
+    name: "remove a receiver from a letter",
+    endpoint: "/api/letter/receiver",
+    method: "DELETE",
+    fields: {letter: "input", receiver: "input"}
+  },
+  {
+    name: "add a receiver to a letter",
+    endpoint: "/api/letter/receiver",
+    method: "PATCH",
+    fields: {letter: "input", receiver: "input"}
+  },
+  {
     name: "Get Session User (logged in user)",
     endpoint: "/api/session",
     method: "GET",
@@ -76,6 +106,12 @@ const operations: operation[] = [
     endpoint: "/api/posts/:id",
     method: "DELETE",
     fields: { id: "input" },
+  },
+  {
+    name:"send email",
+    endpoint:"/api/email",
+    method:"POST",
+    fields:{to:"input", content:"input"}
   },
 ];
 

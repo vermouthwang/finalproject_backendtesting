@@ -5,6 +5,7 @@ import { BadValuesError, NotAllowedError, NotFoundError } from "./errors";
 export interface UserDoc extends BaseDoc {
   username: string;
   password: string;
+  userType?: string;
 }
 
 export default class UserConcept {
@@ -36,6 +37,14 @@ export default class UserConcept {
       throw new NotFoundError(`User not found!`);
     }
     return this.sanitizeUser(user);
+  }
+
+  async getUserType(username: string) {
+    const user = await this.users.readOne({ username });
+    if (user === null) {
+      throw new NotFoundError(`User not found!`);
+    }
+    return user.userType;
   }
 
   async idsToUsernames(ids: ObjectId[]) {

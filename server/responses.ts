@@ -1,6 +1,8 @@
 import { User } from "./app";
 import { AlreadyFriendsError, FriendNotFoundError, FriendRequestAlreadyExistsError, FriendRequestDoc, FriendRequestNotFoundError } from "./concepts/friend";
 import { PostAuthorNotMatchError, PostDoc } from "./concepts/post";
+import { TopicDoc } from "./concepts/topic";
+import { WishDoc } from "./concepts/wish";
 import { Router } from "./framework/router";
 
 /**
@@ -36,6 +38,40 @@ export default class Responses {
     const to = requests.map((request) => request.to);
     const usernames = await User.idsToUsernames(from.concat(to));
     return requests.map((request, i) => ({ ...request, from: usernames[i], to: usernames[i + requests.length] }));
+  }
+
+  /**
+   * Convert WishDoc into more readable format for the frontend
+   */
+  static wish(wish: WishDoc | null) {
+    if (!wish) {
+      return wish;
+    }
+    return { ...wish, author: wish.author.toString() };
+  }
+
+  /**
+   * Same as {@link wish} but for an array of WishDoc for improved performance.
+   */
+  static wishes(wishes: WishDoc[]) {
+    return wishes.map((wish) => ({ ...wish, author: wish.author.toString() }));
+  }
+
+  /**
+   * Convert TopicDoc into more readable format for the frontend
+   */
+  static topic(topic: TopicDoc | null) {
+    if (!topic) {
+      return topic;
+    }
+    return { ...topic, author: topic.author.toString() };
+  }
+
+  /**
+   * Same as {@link topic} but for an array of TopicDoc for improved performance.
+   */
+  static topics(topics: TopicDoc[]) {
+    return topics.map((topic) => ({ ...topic, author: topic.author.toString() }));
   }
 }
 
