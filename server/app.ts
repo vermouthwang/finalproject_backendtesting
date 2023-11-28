@@ -1,3 +1,4 @@
+import ContactConcept from "./concepts/contact";
 import DelayConcept from "./concepts/delay";
 import EmailConcept from "./concepts/email";
 import FriendConcept from "./concepts/friend";
@@ -18,3 +19,4 @@ export const Topic = new TopicConcept();
 export const Delay = new DelayConcept();
 export const Letter = new LetterConcept();
 export const Email = new EmailConcept();
+export const Contact = new ContactConcept();

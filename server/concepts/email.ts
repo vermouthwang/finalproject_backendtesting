@@ -48,7 +48,7 @@ export default class EmailConcept {
     // send mail with defined transport object
     const info = await this.transporter.sendMail({
       from: '"Palliative Care App" <testnonreply@vermouthwang.com>', // sender address
-      to: "yinghouwangdesign@gmail.com", // list of receivers
+      to: to, // list of receivers
       subject: "Letter from " + username, // Subject line
       text: "Hi this is Palliative Care App, Our user " +username+ " want to send you a letter. This email is not reply-able: " + text, // plain text body
       // html: "<b>Hello world?</b>", // html body

@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Delay, Email, Friend, Letter, Post, Topic, User, WebSession, Wish } from "./app";
+import { Contact, Delay, Email, Friend, Letter, Post, Topic, User, WebSession, Wish } from "./app";
 import { PostDoc, PostOptions } from "./concepts/post";
 import { TopicDoc } from "./concepts/topic";
 import { UserDoc } from "./concepts/user";
@@ -248,10 +248,10 @@ class Routes {
       const delaydate = new Date(delay);
       if (newletter.letter !== null) {
         const letterdelay = await Delay.createDelay(newletter.letter._id, "reveal", delaydate)
-        return { msg: "Letter created successfully!", letter: newletter, delay: letterdelay };
+        return { letter: newletter, delay: letterdelay };
       }
     }
-    return { msg: "Letter created successfully!", letter: newletter };
+    return newletter;
   }
 
   @Router.get("/letter")
@@ -263,6 +263,27 @@ class Routes {
   @Router.get("/letter/receiver")
   async getLetterbyReceiver(user: ObjectId) {
     return await Letter.getLetterByReceiver(user);
+  }
+
+  @Router.get("/letter/:_id")
+  async getLetterbyId(_id: ObjectId) {
+    return await Letter.getLetterById(_id);
+  }
+
+  @Router.get("/letterunsent")
+  async getAllunsendLetter(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Letter.getAllUnsentLetterbySender(user);
+  }
+
+  @Router.patch("/letter/content")
+  async updateLetterContent(session: WebSessionDoc, letter: ObjectId, content: string) {
+    const user = WebSession.getUser(session);
+    const theletter = await Letter.getLetterById(letter);
+    if (theletter.from.toString() !== user.toString()) {
+      throw new Error("You are not the author of this letter!");
+    }
+    return await Letter.updateLetterContent(letter, content);
   }
 
   @Router.delete("/letter/receiver")
@@ -289,10 +310,138 @@ class Routes {
   async sendLetter(session: WebSessionDoc, letter: ObjectId) {
     const user = WebSession.getUser(session);
     const theletter = await Letter.getLetterById(letter);
+    const username = (await User.getUserById(user)).username;
     if (theletter.from.toString() !== user.toString()) {
       throw new Error("You are not the author of this letter!");
     }
-    return await Letter.sendLetter(letter);
+    await Letter.sendLetter(letter);
+    const thereceiver = theletter.to;
+    for (const receiver of thereceiver) {
+      if ( await Contact.checkContactType(user, receiver) === "NonUser" ) {
+        const receiveremail = await Contact.getemailaddressbyId(receiver);
+        if (receiveremail === null) {
+          continue;
+        }
+        await Email.send(username,receiveremail, theletter.content);
+      }
+    }
+    return { msg: "Letter sent!" };
+  }
+
+  @Router.patch("/letter/unshow")
+  async unshowLetter(session: WebSessionDoc, letter: ObjectId) {
+    const user = WebSession.getUser(session);
+    const theletter = await Letter.getLetterById(letter);
+    if (theletter.from.toString() !== user.toString()) {
+      throw new Error("You are not the author of this letter!");
+    }
+    return await Letter.unshowLetter(letter);
+  }
+
+  @Router.delete("/letter")
+  async deleteLetterServer(letter: ObjectId) {
+    return await Letter.deleteLetter_server(letter);
+  }
+
+  @Router.delete("/letter/client")
+  async deleteLetterClient(session: WebSessionDoc, letter: ObjectId) {
+    const user = WebSession.getUser(session);
+    const theletter = await Letter.getLetterById(letter);
+    if (theletter.from.toString() !== user.toString()) {
+      throw new Error("You are not the author of this letter!");
+    }
+    return await Letter.deleteLetter_client(letter);
+  }
+
+  @Router.patch("/letter/email")
+  async sendLetterEmail(session: WebSessionDoc, letter: ObjectId) {
+    const user = WebSession.getUser(session);
+    const theletter = await Letter.getLetterById(letter);
+    if (theletter.from.toString() !== user.toString()) {
+      throw new Error("You are not the author of this letter!");
+    }
+    const thereceiver = theletter.to;
+    return { msg: "No email sent!" };
+  }
+  // #############Letter Response#####################
+  @Router.post("/letter/response")
+  async createLetterResponse(session: WebSessionDoc, letter: ObjectId, content: string) {
+    const user = WebSession.getUser(session);
+    const theresponse = await Letter.createLetterResponse(letter, user, content);
+    //check if the latter is a letterdoc or letterresponsedoc
+    if (theresponse.letterResponse !== null) {
+    try {
+      const theletter = await Letter.getLetterById(letter);
+      await Letter.addLetterResponsetoLetter(letter, theresponse.letterResponse);
+      return { msg: "Letter Response created successfully!", letter: theletter, response: theresponse };
+    } catch (error) {
+      const theletterresponse = await Letter.getLetterResponseById(letter);
+      await Letter.updateResponseResponse(theletterresponse._id, theresponse.letterResponse);
+      return { msg: "Response Response created successfully!", letter: theletterresponse, response: theresponse };
+    }}
+    return {msg:"Unsuccessful response creation!"}
+  }
+
+  @Router.get("/letter/response")
+  async getaLetterPrimaryResponse(letter: ObjectId) {
+    const theletter = await Letter.getLetterById(letter);
+    return theletter.response;
+  }
+
+  @Router.get("/letter/response/all")
+  async getaLetterAllResponse(letter: ObjectId) {
+    return await Letter.getAllLetterResponseByLetter(letter);
+  }
+
+  @Router.get("/letter/response/:_id")
+  async getaLetterResponse(_id: ObjectId) {
+    return await Letter.getLetterResponseById(_id);
+  }
+
+  @Router.delete("/letter/response")
+  async recursiveDeleteLetterResponse(letter: ObjectId) {
+    return await Letter.recursivelyDeleteLetterResponse(letter);
+  }
+  // ############################################################
+  // Contact
+  // ############################################################
+  @Router.post("/contact")
+  async createUserContact(session: WebSessionDoc, contact: ObjectId) {
+    const user = WebSession.getUser(session);
+    return await Contact.createAppUserContact(user, contact);
+  }
+
+  @Router.get("/contact")
+  async getContacts(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Contact.getContactsbyOwner(user);
+  }
+
+  @Router.get("/contact/type")
+  async checkContactType(session: WebSessionDoc, contact: ObjectId) {
+    const user = WebSession.getUser(session);
+    return await Contact.checkContactType(user, contact);
+  }
+
+  // ##################### email #######################################
+  @Router.post("/contact/email")
+  async createEmailContact(session: WebSessionDoc, username: string, email: string) {
+    const user = WebSession.getUser(session);
+    return await Contact.createEmailContact(user, username, email);
+  }
+
+  @Router.get("/email")
+  async getEmailaddressbyid(_id: ObjectId) {
+    return await Contact.getemailaddressbyId(_id);
+  }
+
+  @Router.get("/email/:username")
+  async getEmailaddressbyusername(username: string) {
+    const emailcontact =  await Contact.getEmailContactbyUsername(username);
+    if (emailcontact === null) {
+      throw new Error("Email contact not found!");
+    }
+    return emailcontact.email;
   }
 
   @Router.post("/email")

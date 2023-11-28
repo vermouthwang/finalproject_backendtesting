@@ -12,10 +12,52 @@ type operation = {
 
 const operations: operation[] = [
   {
+    name: "add User contact",
+    endpoint: "/api/contact",
+    method: "POST",
+    fields: {contact: "input"}
+  },
+  {
+    name: "Get all User Contacts",
+    endpoint: "/api/contact",
+    method: "GET",
+    fields: {}
+  },
+  {
+    name:"create Email contact",
+    endpoint:"/api/contact/email",
+    method:"POST",
+    fields:{username:"input", email:"input"}
+  },
+  // {
+  //   name: "check contact type",
+  //   endpoint: "/api/contact/type",
+  //   method: "GET",
+  //   fields: {contact: "input"}
+  // },
+  // {
+  //   name: "get email address by id",
+  //   endpoint: "/api/email",
+  //   method: "GET",
+  //   fields: {_id: "input"}
+  // },
+  {
+    name: "send letter",
+    endpoint: "/api/letter",
+    method: "PATCH",
+    fields: { letter: "input" },
+  },
+  {
     name: "create letter",
     endpoint: "/api/letter",
     method: "POST",
     fields: { to: "json", content: "input", responseEnabled: "json", delay: "input" },
+  },
+  {
+    name: "update letter content",
+    endpoint: "/api/letter/content",
+    method: "PATCH",
+    fields: { letter: "input", content: "input" },
   },
   {
     name: "get letter by sender",
@@ -30,17 +72,35 @@ const operations: operation[] = [
     fields: {user: "input"}
   },
   {
-    name: "remove a receiver from a letter",
-    endpoint: "/api/letter/receiver",
-    method: "DELETE",
-    fields: {letter: "input", receiver: "input"}
+    name: "get all unsend letters of the user",
+    endpoint: "/api/letterunsent",
+    method: "GET",
+    fields: {}
   },
   {
-    name: "add a receiver to a letter",
-    endpoint: "/api/letter/receiver",
-    method: "PATCH",
-    fields: {letter: "input", receiver: "input"}
+    name: "delete(unshow) letter(client)",
+    endpoint: "/api/letter/client",
+    method: "DELETE",
+    fields: {letter: "input"}
   },
+  {
+    name: "delete letter(server)",
+    endpoint: "/api/letter/client",
+    method: "DELETE",
+    fields: {letter: "input"}
+  },
+  // {
+  //   name: "remove a receiver from a letter",
+  //   endpoint: "/api/letter/receiver",
+  //   method: "DELETE",
+  //   fields: {letter: "input", receiver: "input"}
+  // },
+  // {
+  //   name: "add a receiver to a letter",
+  //   endpoint: "/api/letter/receiver",
+  //   method: "PATCH",
+  //   fields: {letter: "input", receiver: "input"}
+  // },
   {
     name: "Get Session User (logged in user)",
     endpoint: "/api/session",

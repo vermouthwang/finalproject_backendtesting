@@ -68,7 +68,7 @@ export default class LetterConcept<T> {
   public readonly letterResponses = new DocCollection<LetterResponseDoc<T>>("letterResponses");
 
   async createLetter(from: ObjectId, to: ObjectId[], content: string, responseEnabled: boolean, response: LetterResponseDoc<T>[] = [], send: boolean = false, show: boolean = true) {
-    const _id = await this.letters.createOne({ from, to, content, responseEnabled, response, send });
+    const _id = await this.letters.createOne({ from, to, content, responseEnabled, response, send, show });
     return { msg: "Letter successfully saved!", letter: await this.letters.readOne({ _id }) };
   }
 
@@ -104,18 +104,17 @@ export default class LetterConcept<T> {
       throw new NotFoundError(`There is no Letter to ${receiver}.`);
     }
     return result;
-    // const letters = await this.letters.readMany({ to: receiver });
-    // if (!letters) {
-    //   throw new NotFoundError(`There is no Letter to ${receiver}.`);
-    // }
-    // return letters;
   }
 
-  async getAllunsendLetter() {
-    const letters = await this.letters.readMany({ send: false });
+  async getAllUnsentLetterbySender(sender: ObjectId) {
+    const letters = await this.letters.readMany({ from: sender, send: false });
     return letters;
   }
 
+  async getAllSendLetter() {
+    const letters = await this.letters.readMany({ send: true });
+    return letters;
+  }
   //UPDATE____________________________________________________________________________
   async updateLetterContent(_id: ObjectId, content: string) {
     const letters = await this.getLetterById(_id)
@@ -183,7 +182,7 @@ export default class LetterConcept<T> {
   async sendLetter(_id: ObjectId) {
     const letters = await this.getLetterById(_id)
     if (letters.send === true) {
-      throw new NotAllowedError(`Letter ${_id} has already been sent.`);
+      throw new NotAllowedError(`Letter has already been sent.`);
     }
     await this.letters.updateOne({ _id }, { send: true });
     return { msg: "Letter is sent!" };
@@ -200,10 +199,10 @@ export default class LetterConcept<T> {
   async deleteLetter_client(_id: ObjectId) {
     // for client operation, the client can only delete the letter that has not been sent
     const letters = await this.getLetterById(_id)
-    if (letters.send === true) {
-      throw new NotAllowedError(`Letter ${_id} has been sent, you cannot delete it.`);
+    if (letters.send) {
+      return await this.unshowLetter(_id);
     }
-    await this.letters.deleteOne({ _id });
+    await this.deleteLetter_server(_id);
     //recursively delete the Response under the letter
     await this.recursivelyDeleteLetterResponse(_id)
     return { msg: "Letter deleted successfully!" };
