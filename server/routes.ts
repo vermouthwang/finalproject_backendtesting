@@ -236,6 +236,7 @@ class Routes {
   // ############################################################
   // Letter
   // ############################################################
+  //CHECK//
   @Router.post("/letter")
   async createLetter( session: WebSessionDoc, 
                       to: ObjectId[] , 
@@ -254,28 +255,33 @@ class Routes {
     return newletter;
   }
 
+  //CHECK//
   @Router.get("/letter")
   async getLetterbySender(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
     return await Letter.getLetterBySender(user);
   }
 
+  //CHECK//
   @Router.get("/letter/receiver")
   async getLetterbyReceiver(user: ObjectId) {
     return await Letter.getLetterByReceiver(user);
   }
 
-  @Router.get("/letter/:_id")
-  async getLetterbyId(_id: ObjectId) {
-    return await Letter.getLetterById(_id);
+  //CHECK//
+  @Router.get("/letter/id")
+  async getLetterbyId(id: ObjectId) {
+    return await Letter.getLetterById(id);
   }
 
+  //CHECK//
   @Router.get("/letterunsent")
   async getAllunsendLetter(session: WebSessionDoc) {
     const user = WebSession.getUser(session);
     return await Letter.getAllUnsentLetterbySender(user);
   }
 
+  //CHECK//
   @Router.patch("/letter/content")
   async updateLetterContent(session: WebSessionDoc, letter: ObjectId, content: string) {
     const user = WebSession.getUser(session);
@@ -286,6 +292,7 @@ class Routes {
     return await Letter.updateLetterContent(letter, content);
   }
 
+  //TODO//
   @Router.delete("/letter/receiver")
   async removeReceiver(session: WebSessionDoc, letter: ObjectId, receiver: ObjectId) {
     const user = WebSession.getUser(session);
@@ -296,6 +303,7 @@ class Routes {
     return await Letter.removeLetterReceiver(letter, receiver);
   }
 
+  //TODO//
   @Router.patch("/letter/receiver")
   async addReceiver(session: WebSessionDoc, letter: ObjectId, receiver: ObjectId) {
     const user = WebSession.getUser(session);
@@ -306,6 +314,7 @@ class Routes {
     return await Letter.addLetterReceiver(letter, receiver);
   }
 
+  //CHECK//
   @Router.patch("/letter")
   async sendLetter(session: WebSessionDoc, letter: ObjectId) {
     const user = WebSession.getUser(session);
@@ -327,6 +336,14 @@ class Routes {
     }
     return { msg: "Letter sent!" };
   }
+
+  //check//
+  @Router.get("/receiveletter")
+  async receiveLetter(session: WebSessionDoc) {
+    const user = WebSession.getUser(session);
+    return await Letter.receiveLetter(user);
+  }
+
 
   @Router.patch("/letter/unshow")
   async unshowLetter(session: WebSessionDoc, letter: ObjectId) {
@@ -364,44 +381,26 @@ class Routes {
     return { msg: "No email sent!" };
   }
   // #############Letter Response#####################
-  @Router.post("/letter/response")
-  async createLetterResponse(session: WebSessionDoc, letter: ObjectId, content: string) {
+  @Router.post("/letterrespond")
+  async respondtoLetter(session: WebSessionDoc, originalletter: ObjectId, content: string) {
     const user = WebSession.getUser(session);
-    const theresponse = await Letter.createLetterResponse(letter, user, content);
-    //check if the latter is a letterdoc or letterresponsedoc
-    if (theresponse.letterResponse !== null) {
-    try {
-      const theletter = await Letter.getLetterById(letter);
-      await Letter.addLetterResponsetoLetter(letter, theresponse.letterResponse);
-      return { msg: "Letter Response created successfully!", letter: theletter, response: theresponse };
-    } catch (error) {
-      const theletterresponse = await Letter.getLetterResponseById(letter);
-      await Letter.updateResponseResponse(theletterresponse._id, theresponse.letterResponse);
-      return { msg: "Response Response created successfully!", letter: theletterresponse, response: theresponse };
-    }}
-    return {msg:"Unsuccessful response creation!"}
+    const theresponse = await Letter.respondtoLetter(user, originalletter, content);
+    return theresponse;
   }
 
-  @Router.get("/letter/response")
-  async getaLetterPrimaryResponse(letter: ObjectId) {
-    const theletter = await Letter.getLetterById(letter);
-    return theletter.response;
+  @Router.get("/letterrespond")
+  async getLetterResponse(originalletter: ObjectId) {
+    const theresponse = await Letter.getLetterResponseByLetter(originalletter);
+    return theresponse;
   }
 
-  @Router.get("/letter/response/all")
-  async getaLetterAllResponse(letter: ObjectId) {
-    return await Letter.getAllLetterResponseByLetter(letter);
+  //USE THIS IN ALPHA VERSION??
+  @Router.get("/primaryrespond")
+  async getPrimaryResponse(originalletter: ObjectId) {
+    const theresponse = await Letter.getPrimaryResponse(originalletter);
+    return theresponse;
   }
 
-  @Router.get("/letter/response/:_id")
-  async getaLetterResponse(_id: ObjectId) {
-    return await Letter.getLetterResponseById(_id);
-  }
-
-  @Router.delete("/letter/response")
-  async recursiveDeleteLetterResponse(letter: ObjectId) {
-    return await Letter.recursivelyDeleteLetterResponse(letter);
-  }
   // ############################################################
   // Contact
   // ############################################################

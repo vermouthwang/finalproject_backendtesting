@@ -24,6 +24,36 @@ const operations: operation[] = [
     fields: {}
   },
   {
+    name:"get letter by id",
+    endpoint:"/api/letter/id",
+    method:"GET",
+    fields:{id:"input"}
+  },
+  {
+    name: "Respond to a letter",
+    endpoint: "/api/letterrespond",
+    method: "POST",
+    fields: {originalletter: "input", content: "input"}
+  },
+  {
+    name: "Get response response",
+    endpoint: "/api/letterrespond",
+    method: "GET",
+    fields: {originalletter: "input"}
+  },
+  {
+    name: "Get primary respond",
+    endpoint: "/api/primaryrespond",
+    method: "GET",
+    fields: {originalletter: "input"}
+  },
+  {
+    name:"get letter receive by the user",
+    endpoint:"/api/receiveletter",
+    method:"GET",
+    fields:{}
+  },
+  {
     name:"create Email contact",
     endpoint:"/api/contact/email",
     method:"POST",

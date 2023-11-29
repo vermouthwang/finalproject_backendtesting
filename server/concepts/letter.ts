@@ -48,16 +48,17 @@ export interface LetterDoc<T> extends BaseDoc {
   to: ObjectId[];
   content: string;
   responseEnabled: boolean;
-  response: LetterResponseDoc<T>[];
+  type: "letters" | "responses";
+  response: LetterDoc<T>[];
   send: boolean;
   show: boolean;
 }
-export interface LetterResponseDoc<T> extends BaseDoc {
-  letter: ObjectId;
-  responsefrom: ObjectId;
-  content: string | null;
-  response: LetterResponseDoc<T>[];
-}
+// export interface LetterResponseDoc<T> extends BaseDoc {
+//   letter: ObjectId;
+//   responsefrom: ObjectId;
+//   content: string | null;
+//   response: LetterResponseDoc<T>[];
+// }
 
 export async function compareIdbyString(a: ObjectId, b: ObjectId) {
   return a.toString() === b.toString();
@@ -65,10 +66,17 @@ export async function compareIdbyString(a: ObjectId, b: ObjectId) {
 
 export default class LetterConcept<T> {
   public readonly letters = new DocCollection<LetterDoc<T>>("letters");
-  public readonly letterResponses = new DocCollection<LetterResponseDoc<T>>("letterResponses");
+  // public readonly letterResponses = new DocCollection<LetterResponseDoc<T>>("letterResponses");
 
-  async createLetter(from: ObjectId, to: ObjectId[], content: string, responseEnabled: boolean, response: LetterResponseDoc<T>[] = [], send: boolean = false, show: boolean = true) {
-    const _id = await this.letters.createOne({ from, to, content, responseEnabled, response, send, show });
+  async createLetter( from: ObjectId, 
+                      to: ObjectId[], 
+                      content: string, 
+                      responseEnabled: boolean, 
+                      type: "letters" | "responses" = "letters", 
+                      response: LetterDoc<T>[] = [], 
+                      send: boolean = false, 
+                      show: boolean = true) {
+    const _id = await this.letters.createOne({ from, to, content, responseEnabled, response, type, send, show });
     return { msg: "Letter successfully saved!", letter: await this.letters.readOne({ _id }) };
   }
 
@@ -81,17 +89,18 @@ export default class LetterConcept<T> {
     return letters;
   }
 
+  //this one only serve letter type letter, not response
   async getLetterBySender(sender: ObjectId) {
-    const letters =  await this.letters.readMany({ from: sender });
+    const letters =  await this.letters.readMany({ from: sender, type: "letters" });
     if (!letters) {
-      throw new NotFoundError(`There is no Letter from ${sender}.`);
+      throw new NotFoundError(`There is no Letter original from ${sender}.`);
     }
     return letters;
   }
-
+  //this one only serve letter type letter, not response
   async getLetterByReceiver(receiver: ObjectId) {
     // loop through all the letter and compared by toString
-    const letters = await this.letters.readMany({});
+    const letters = await this.letters.readMany({type: "letters"});
     let result: LetterDoc<T>[] = [];
     for (const letter of letters) {
       for (const to of letter.to) {
@@ -106,15 +115,30 @@ export default class LetterConcept<T> {
     return result;
   }
 
+  //no type checking because all response are sent automatically
   async getAllUnsentLetterbySender(sender: ObjectId) {
     const letters = await this.letters.readMany({ from: sender, send: false });
     return letters;
   }
 
+  // only serve letter type letter, not response
   async getAllSendLetter() {
-    const letters = await this.letters.readMany({ send: true });
+    const letters = await this.letters.readMany({ send: true, type: "letters" });
     return letters;
   }
+
+  async receiveLetter(receiver: ObjectId) {
+    const letters = await this.getLetterByReceiver(receiver)
+    // const letters = await this.letters.readMany({ to: receiver, send: true });
+    const receivedLetter: LetterDoc<T>[] = [];
+    for (const letter of letters) {
+      if (letter.send && letter.show) {
+        receivedLetter.push(letter);
+      }
+    }
+    return receivedLetter;
+  }
+
   //UPDATE____________________________________________________________________________
   async updateLetterContent(_id: ObjectId, content: string) {
     const letters = await this.getLetterById(_id)
@@ -167,17 +191,17 @@ export default class LetterConcept<T> {
     return { msg: "The receiver is added!" };
   }
 
-  async addLetterResponsetoLetter(_id: ObjectId,response: LetterResponseDoc<T>) {
-    const letters = await this.getLetterById(response.letter)
-    if (!letters.responseEnabled){
-      throw new NotAllowedError(`Letter ${_id} is not response allowed.`);
-    }
-    //push the new response to the letter response list
-    const oldResponse = letters.response;
-    const newResponse = letters.response.concat(response);
-    await this.letters.updateOne({ _id }, { response: newResponse });
-    return { msg: "The response is added!" };
-  }
+  // async addLetterResponsetoLetter(_id: ObjectId,response: LetterResponseDoc<T>) {
+  //   const letters = await this.getLetterById(response.letter)
+  //   if (!letters.responseEnabled){
+  //     throw new NotAllowedError(`Letter ${_id} is not response allowed.`);
+  //   }
+  //   //push the new response to the letter response list
+  //   const oldResponse = letters.response;
+  //   const newResponse = letters.response.concat(response);
+  //   await this.letters.updateOne({ _id }, { response: newResponse });
+  //   return { msg: "The response is added!" };
+  // }
 
   async sendLetter(_id: ObjectId) {
     const letters = await this.getLetterById(_id)
@@ -198,13 +222,13 @@ export default class LetterConcept<T> {
   //DELETE____________________________________________________________________________
   async deleteLetter_client(_id: ObjectId) {
     // for client operation, the client can only delete the letter that has not been sent
+    // if the letter has been sent, the client can only unshow the letter (to themselves)
     const letters = await this.getLetterById(_id)
     if (letters.send) {
       return await this.unshowLetter(_id);
     }
     await this.deleteLetter_server(_id);
-    //recursively delete the Response under the letter
-    await this.recursivelyDeleteLetterResponse(_id)
+    await this.recursivelyDeleteLetterResponse(letters)
     return { msg: "Letter deleted successfully!" };
   }
 
@@ -212,63 +236,154 @@ export default class LetterConcept<T> {
     //for server oepartion, we do not need to check if the letter has been sent or not
     const letters = await this.getLetterById(_id)
     //delete response first
-    const letterResponses = await this.getAllLetterResponseByLetter(_id);
-    for (const letterResponse of letterResponses) {
-      await this.letterResponses.deleteOne({ _id: letterResponse._id });
-    }
+    await this.recursivelyDeleteLetterResponse(letters)
     await this.letters.deleteOne({ _id });
+    return { msg: "Letter deleted successfully!" };
   }
 
+  async recursivelyDeleteLetterResponse(letter: LetterDoc<T>) {
+    const theletterResponses = letter.response;
+    if (theletterResponses.length > 0) {
+      for (const letterResponse of theletterResponses) {
+        //first delete the response of the response
+        await this.recursivelyDeleteLetterResponse(letterResponse);
+        await this.letters.deleteOne({ _id: letterResponse._id });
+      }
+    }
+    else {
+      return { msg: "Letter response deleted successfully!" };
+    }
+  }
+
+  async respondtoLetter (from: ObjectId, originalletter: ObjectId, content: string, ){
+    const originalletterdoc = await this.getLetterById(originalletter)
+    if (!originalletterdoc.responseEnabled){
+      throw new NotAllowedError(`Letter ${originalletter} is not response allowed.`);
+    }
+    if (originalletterdoc.send !== true) {
+      throw new NotAllowedError(`Letter ${originalletter} has not been sent yet, you cannot response to it.`);
+    }
+    const to = [originalletterdoc.from]
+    const response = await this.createLetter(from, to, content, true, "responses", [], true, true)
+    //update the original letter
+    if (response.letter){
+      await this.updateLetterResponse(originalletter, response.letter)
+      return {msg: "Successfully respond!", letter: response.letter}
+    } 
+    return {msg: "Failed to respond!"}
+  }
+
+  async updateLetterResponse(_id: ObjectId, response: LetterDoc<T>) {
+    const letters = await this.getLetterById(_id)
+    //push the new response to the letter response list
+    const oldResponse = letters.response;
+    const newResponse = oldResponse.concat(response);
+    await this.letters.updateOne({ _id }, { response: newResponse });
+  }
+
+  async getLetterResponseByLetter(_id: ObjectId) {
+    const letters = await this.getLetterById(_id)
+    // return {msg: "not implemented yet"}
+    const responses = letters.response
+    const result = [responses]
+    // result.concat(responses)
+    if (responses.length > 0) {
+      for (const response of responses) {
+        const subresponse = await this.getLetterResponseByLetter(response._id)
+        //push the new response to the letter response list
+        for (const sub of subresponse) {
+          result.push(sub)
+        }
+      }
+    }
+    return result
+  }
+
+  async getPrimaryResponse(id: ObjectId) {
+    const letter = await this.getLetterById(id)
+    const responses = letter.response
+    return responses
+  }
+
+  //type check
+  async checkifLetter(object: ObjectId){
+    const letter = await this.letters.readOne({ _id: object });
+    if (letter === null){
+      return false;
+    }
+    return true;
+  }
   // ________________________________________________________________________________________________________________________________________________________
   // aync function for letterResponse________________________________________________________________________________________________________________________
-  async createLetterResponse(letter: ObjectId, responsefrom: ObjectId, content: string | null , response: LetterResponseDoc<T>[] = []) {
-    const letters = await this.getLetterById(letter)
-    if (!letters.responseEnabled){
-      throw new NotAllowedError(`Letter ${letter} is not response allowed.`);
-    }
-    if (letters.send !== true) {
-      throw new NotAllowedError(`Letter ${letter} has not been sent yet, you cannot response to it.`);
-    }
-    const _id = await this.letterResponses.createOne({ letter, responsefrom, content, response });
-    return { msg: "Successfully respond!", letterResponse: await this.letterResponses.readOne({ _id }) };
-  }
+  // async createLetterResponse(letter: ObjectId, responsefrom: ObjectId, content: string | null , response: LetterResponseDoc<T>[] = []) {
+  //   if (await this.checkifLetter(letter)){
+  //     const letters = await this.getLetterById(letter)
+  //     if (!letters.responseEnabled){
+  //       throw new NotAllowedError(`Letter ${letter} is not response allowed.`);
+  //     }
+  //     if (letters.send !== true) {
+  //       throw new NotAllowedError(`Letter ${letter} has not been sent yet, you cannot response to it.`);
+  //     }
+  //     const _id = await this.letterResponses.createOne({ letter, responsefrom, content, response });
+  //     return { msg: "Successfully respond!", letterResponse: await this.letterResponses.readOne({ _id }) };
+  //   } else if (await this.checkifLetterResponse(letter)){
+  //     // const letterResponse = await this.getLetterResponseById(letter)
+  //     const _id = await this.letterResponses.createOne({ letter: letter, responsefrom, content, response });
+  //     //update the response's response
+  //     const Responsesresponse = await this.letterResponses.readOne({_id})
+  //     if (Responsesresponse) {
+  //       await this.updateResponseResponse(letter, Responsesresponse);
+  //       return { msg: "Successfully respond!", letterResponse: await this.letterResponses.readOne({ _id }) };
+  //     }
+  //   }
+  // }
   //GET
-  async getLetterResponseById(_id: ObjectId) {
-    const response = await this.letters.readOne({ _id });
-    if (!response) {
-      throw new NotFoundError(`Letter response ${_id} does not exist!`);
-    }
-    return response;
-  }
+  // async getLetterResponseById(_id: ObjectId) {
+  //   const response = await this.letterResponses.readOne({ _id });
+  //   if (!response) {
+  //     throw new NotFoundError(`Letter response ${_id} does not exist!`);
+  //   }
+  //   return response;
+  // }
 
-  async getAllLetterResponseByLetter(originalletter: ObjectId) {
-    return await this.letterResponses.readMany({ letter: originalletter });
-  }
+  // async getAllLetterResponseByLetter(originalletter: ObjectId) {
+  //   return await this.letterResponses.readMany({ letter: originalletter });
+  // }
 
-  async getLetterResponseByresponsefrom(responsefrom: ObjectId) {
-    return await this.letterResponses.readMany({ responsefrom });
-  }
+  // async getLetterResponseByresponsefrom(responsefrom: ObjectId) {
+  //   return await this.letterResponses.readMany({ responsefrom });
+  // }
 
-  //UPDATE
-  async updateResponseResponse(_id: ObjectId, response: LetterResponseDoc<T>) {
-    const theletterResponse = await this.getLetterResponseById(_id)
-    //push the new response to the letter response list
-    const oldResponse = theletterResponse.response;
-    const newResponse = theletterResponse.response.concat(response);
-    await this.letterResponses.updateOne({ _id }, { response: newResponse });
-    return { msg: "The response is added!" };
-  }
+  // //UPDATE
+  // async updateResponseResponse(_id: ObjectId, response: LetterResponseDoc<T>) {
+  //   const theletterResponse = await this.getLetterResponseById(_id)
+  //   //push the new response to the letter response list
+  //   const oldResponse = theletterResponse.response;
+  //   const newResponse = oldResponse.concat(response);
+  //   await this.letterResponses.updateOne({ _id }, { response: newResponse });
+  //   return { msg: "The response is added!" };
+  // }
 
   //DELETE
-  async recursivelyDeleteLetterResponse(letter: ObjectId) {
-    const theletterResponses = await this.getAllLetterResponseByLetter(letter);
-    for (const letterResponse of theletterResponses) {
-      //first delete the response of the response
-      if (letterResponse.response.length > 0) {
-        await this.recursivelyDeleteLetterResponse(letterResponse.letter);
-      }
-      await this.letterResponses.deleteOne({ _id: letterResponse._id });
-    }
-    return { msg: "Letter response deleted successfully!" };
-  }
+  // async recursivelyDeleteLetterResponse(letter: ObjectId) {
+  //   const theletterResponses = await this.getAllLetterResponseByLetter(letter);
+  //   for (const letterResponse of theletterResponses) {
+  //     //first delete the response of the response
+  //     if (letterResponse.response.length > 0) {
+  //       await this.recursivelyDeleteLetterResponse(letterResponse.letter);
+  //     }
+  //     await this.letterResponses.deleteOne({ _id: letterResponse._id });
+  //   }
+  //   return { msg: "Letter response deleted successfully!" };
+  // }
+
+
+
+  // async checkifLetterResponse(object: ObjectId){
+  //   const letterResponse = await this.letterResponses.readOne({ _id: object });
+  //   if (letterResponse === null){
+  //     return false;
+  //   }
+  //   return true;
+  // }
 }
